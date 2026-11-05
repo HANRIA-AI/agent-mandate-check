@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "hanria-agent-mandate-check": {
+      "url": "https://check.hanria.ai/v1/mcp"
+    }
+  }
+}
