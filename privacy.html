@@ -1,0 +1,18 @@
+Data handling
+
+Request bodies are evaluated in memory and not stored.
+
+Nostr: job requests sent to HANRIA's Nostr service and HANRIA's results are public events on third-party relays and cannot be recalled. Results reference the request by event id only and do not copy its content. Do not send personal data or confidential policies over Nostr. To avoid answering a job twice, the Nostr service keeps on HANRIA's machine each request's event id, its time, the requester's public key and the result's event id. It deletes them once they are older than 8 days, when it next handles a job.
+
+The only telemetry is: "per UTC day, counts keyed by route, tool, outcome, and flag (real, probe,
+test); error counts keyed by route, tool, fixed category, and flag (real, probe, test); failure counts keyed by route, kind, and flag (real, probe, test), and for invalid_params and bad_json also by a fixed detail value; count of MCP `initialize`
+requests; count of MCP initialize requests by a fixed client label (for example claude-desktop, cursor or other), derived from the client's self-reported name; the name itself is not stored; count of `tools/call` requests." No session ids, IPs,
+user agents, bodies, tool arguments, error text, digests or client names are stored. Calls per initialize is reported as a rough
+intensity figure, not as repeat use by the same party. No replay deduplication: without a stable
+caller key it cannot be done honestly, so raw counts are reported and bursts are flagged by volume
+only.
+
+Cloudflare may keep standard request metadata under its own terms.
+
+Secret scanning is best effort. It runs after the data reaches Cloudflare and cannot recognise
+confidential policy text. Do not send secrets, personal data or confidential policies.

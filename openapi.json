@@ -1,0 +1,575 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "HANRIA hosted check",
+    "version": "0.7.4",
+    "description": "Check a proposed agent action against an operator-authored mandate."
+  },
+  "servers": [
+    {
+      "url": "https://check.hanria.ai"
+    }
+  ],
+  "security": [],
+  "paths": {
+    "/v1/check": {
+      "post": {
+        "operationId": "checkAction",
+        "description": "Free advisory check. It cannot stop an action and keeps no request content. Treat error as deny.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mandate": {
+                    "title": "HANRIA mandate",
+                    "description": "An operator-authored statement of what an agent may do. Written by a person, read by an agent, evaluated locally. A mandate is advisory: it describes intended authority and supports a local check, but it does not enforce anything. Enforcement requires a component that exclusively holds the credentials and can refuse.",
+                    "type": "object",
+                    "required": [
+                      "schema_version",
+                      "mandate_id",
+                      "purpose",
+                      "default",
+                      "clauses"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "schema_version": {
+                        "const": "0.2-draft",
+                        "description": "Draft. The shape may change while the runtime is in development."
+                      },
+                      "mandate_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Stable identifier for this mandate. Appears in every decision record made against it."
+                      },
+                      "issued_by": {
+                        "type": "string",
+                        "description": "Who wrote this mandate. Free text; not authenticated by anything in this skill."
+                      },
+                      "purpose": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "What the agent is authorized to accomplish, in the operator's own words. Not evaluated mechanically; it is the human-readable statement against which a reviewer judges whether the clauses actually express the intent."
+                      },
+                      "not_valid_after": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "RFC 3339 timestamp. After this instant every action is denied. Absent means no expiry, which is discouraged: an unbounded mandate is the condition that lets delegated authority outlive the task it was granted for."
+                      },
+                      "default": {
+                        "enum": [
+                          "deny",
+                          "escalate"
+                        ],
+                        "description": "What happens when no clause matches. 'permit' is deliberately not an option: a mandate that permits by default cannot express a limit."
+                      },
+                      "requires_human": {
+                        "type": "array",
+                        "description": "Operation kinds that always require a person, even where a clause permits them. These escalate rather than permit.",
+                        "items": {
+                          "enum": [
+                            "file",
+                            "process",
+                            "package",
+                            "network",
+                            "device",
+                            "credential_use",
+                            "transaction",
+                            "administrative"
+                          ]
+                        },
+                        "minItems": 0
+                      },
+                      "clauses": {
+                        "type": "array",
+                        "minItems": 1,
+                        "description": "Evaluated in order. The first matching clause decides. A request matching no clause takes the mandate default.",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "effect",
+                            "match"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Identifier for this clause. Returned with every decision so a reviewer can see which sentence of the mandate was relied on."
+                            },
+                            "effect": {
+                              "enum": [
+                                "permit",
+                                "deny",
+                                "escalate"
+                              ],
+                              "description": "What this clause does when it matches."
+                            },
+                            "note": {
+                              "type": "string",
+                              "description": "Why this clause exists. Carried into the decision record verbatim."
+                            },
+                            "match": {
+                              "type": "object",
+                              "required": [
+                                "kind"
+                              ],
+                              "additionalProperties": false,
+                              "description": "All present conditions must hold for the clause to match.",
+                              "properties": {
+                                "kind": {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "description": "Operation kinds this clause covers.",
+                                  "items": {
+                                    "enum": [
+                                      "file",
+                                      "process",
+                                      "package",
+                                      "network",
+                                      "device",
+                                      "credential_use",
+                                      "transaction",
+                                      "administrative"
+                                    ]
+                                  }
+                                },
+                                "verb": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "description": "Permitted verbs, matched case-insensitively and exactly. Absent means any verb.",
+                                  "minItems": 1
+                                },
+                                "target_prefix": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "description": "The operation target must begin with one of these strings. Absent means any target. Prefix matching is deliberately literal: it does not resolve symlinks, normalize paths, or understand hostnames, so a target is compared as written.",
+                                  "minItems": 1
+                                },
+                                "counterparty": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "description": "Permitted counterparties, matched exactly. Absent means any counterparty.",
+                                  "minItems": 1
+                                },
+                                "max_amount": {
+                                  "type": "object",
+                                  "required": [
+                                    "value",
+                                    "currency"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Ceiling for an operation carrying an amount. A request above it does not match this clause.",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "description": "Decimal as a string, to avoid float error."
+                                    },
+                                    "currency": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "$comment": "A mandate names what may be done, not the means of doing it, and must never contain a credential, secret, key or token. The checker refuses a mandate carrying recognizable credential material rather than evaluating it, because anything in a clause note is copied into the decision record. That detection is a heuristic and cannot be complete."
+                  },
+                  "action": {
+                    "title": "HANRIA action request",
+                    "description": "A typed description of a proposed operation, submitted by an agent to a local HANRIA runtime. MUST NOT contain credentials, secrets, private keys, or tokens.",
+                    "type": "object",
+                    "required": [
+                      "schema_version",
+                      "requested_by",
+                      "operation",
+                      "justification"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "schema_version": {
+                        "const": "0.1-draft",
+                        "description": "Draft. The runtime does not exist; this shape may change."
+                      },
+                      "requested_by": {
+                        "type": "object",
+                        "required": [
+                          "agent"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "agent": {
+                            "type": "string",
+                            "description": "Identifier of the requesting agent."
+                          },
+                          "session": {
+                            "type": "string",
+                            "description": "Optional session or task identifier."
+                          },
+                          "on_behalf_of": {
+                            "type": "string",
+                            "description": "Optional identifier of the human or system the agent acts for."
+                          }
+                        }
+                      },
+                      "operation": {
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "verb",
+                          "target"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "file",
+                              "process",
+                              "package",
+                              "network",
+                              "device",
+                              "credential_use",
+                              "transaction",
+                              "administrative"
+                            ]
+                          },
+                          "target": {
+                            "type": "string",
+                            "description": "What the operation acts on. A path, host, package name, or resource identifier. NEVER a secret. Required for the same reason as the verb.",
+                            "minLength": 1
+                          },
+                          "verb": {
+                            "type": "string",
+                            "description": "What is to be done to the target, e.g. read, write, execute, install, connect, sign, transfer. Required: an operation named only by its kind does not describe a proposed action well enough to be judged.",
+                            "minLength": 1
+                          },
+                          "parameters": {
+                            "type": "object",
+                            "description": "Non-secret parameters. A runtime MUST reject any request whose parameters appear to contain a credential."
+                          },
+                          "amount": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "value": {
+                                "type": "string",
+                                "description": "Decimal as a string, to avoid float error.",
+                                "minLength": 1
+                              },
+                              "currency": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "value",
+                              "currency"
+                            ],
+                            "description": "An amount. Both fields are required: a bare amount object describes nothing a ceiling could be compared against."
+                          },
+                          "counterparty": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "justification": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Why the agent believes this is within its mandate. Free text, for the record."
+                      },
+                      "mandate_ref": {
+                        "type": "string",
+                        "description": "Optional reference to the owner-defined mandate the agent believes authorizes this."
+                      },
+                      "idempotency_key": {
+                        "type": "string",
+                        "description": "Optional. Lets a runtime refuse a duplicate rather than perform an operation twice."
+                      }
+                    },
+                    "$comment": "Forbidden anywhere in an instance: credential, secret, private_key, token, password, api_key. A runtime is expected to refuse a request containing them rather than strip them."
+                  }
+                },
+                "required": [
+                  "mandate",
+                  "action"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "mandate": {
+                  "schema_version": "0.2-draft",
+                  "mandate_id": "minimal-permit",
+                  "purpose": "Permit one file action.",
+                  "default": "deny",
+                  "clauses": [
+                    {
+                      "id": "permit-file",
+                      "effect": "permit",
+                      "match": {
+                        "kind": [
+                          "file"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "action": {
+                  "schema_version": "0.1-draft",
+                  "requested_by": {
+                    "agent": "example-agent"
+                  },
+                  "operation": {
+                    "kind": "file",
+                    "verb": "read",
+                    "target": "/tmp/example"
+                  },
+                  "justification": "Read the permitted file."
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Check result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schema_version": {
+                      "type": "string",
+                      "const": "0.1-draft"
+                    },
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "permit",
+                        "deny",
+                        "escalate",
+                        "error"
+                      ],
+                      "description": "Treat error as deny."
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "mandate_ref": {
+                      "type": "string"
+                    },
+                    "clause": {
+                      "type": "string",
+                      "description": "The clause that decided, when one did."
+                    },
+                    "clause_note": {
+                      "type": "string"
+                    },
+                    "action_digest": {
+                      "type": "string",
+                      "description": "SHA-256 of hanria-action-v1 followed by the action's canonical JSON."
+                    },
+                    "receipt": {
+                      "type": "object",
+                      "description": "Ed25519-signed receipt binding the outcome to this action and mandate for 15 minutes. Keys and the signed-bytes rule: https://check.hanria.ai/.well-known/hanria-receipt-keys.json",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "hanria-receipt-v1"
+                        },
+                        "kid": {
+                          "type": "string"
+                        },
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "permit",
+                            "deny",
+                            "escalate"
+                          ]
+                        },
+                        "action_digest": {
+                          "type": "string"
+                        },
+                        "mandate_digest": {
+                          "type": "string"
+                        },
+                        "mandate_ref": {
+                          "type": "string"
+                        },
+                        "clause": {
+                          "type": "string"
+                        },
+                        "issued_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "not_after": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "signature": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "kid",
+                        "outcome",
+                        "action_digest",
+                        "mandate_digest",
+                        "issued_at",
+                        "not_after",
+                        "signature"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "schema_version",
+                    "outcome",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed input, size limit violation, or refused secret material.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "bad_request"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The daily service limit is exhausted; retry after the stated interval.",
+            "headers": {
+              "retry-after": {
+                "description": "Seconds until the next attempt may be made.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "service_unavailable"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/hanria-receipt-keys.json": {
+      "get": {
+        "operationId": "getReceiptKeys",
+        "description": "Public verification keys for signed receipts. No authentication is required.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Ed25519 receipt verification keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kty": {
+                            "const": "OKP"
+                          },
+                          "crv": {
+                            "const": "Ed25519"
+                          },
+                          "x": {
+                            "type": "string"
+                          },
+                          "kid": {
+                            "type": "string"
+                          },
+                          "use": {
+                            "const": "sig"
+                          },
+                          "alg": {
+                            "const": "EdDSA"
+                          }
+                        },
+                        "required": [
+                          "kty",
+                          "crv",
+                          "x",
+                          "kid"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "keys"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No receipt signing key is configured.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

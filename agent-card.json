@@ -1,0 +1,79 @@
+{
+  "name": "HANRIA mandate check",
+  "description": "Check whether a proposed agent action is allowed before you act. Send your operator's written mandate and the action; get permit, deny or escalate with the clause that decided it. Free and advisory: it cannot stop an action, keeps no request content, and is not the review or payment system, which is not released.",
+  "supportedInterfaces": [
+    {
+      "url": "https://check.hanria.ai/v1/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
+  "provider": {
+    "organization": "HANRIA",
+    "url": "https://hanria.ai/"
+  },
+  "version": "0.6.0",
+  "documentationUrl": "https://hanria.ai/llms.txt",
+  "iconUrl": "https://check.hanria.ai/icon-512.png",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "defaultInputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "check_action",
+      "name": "Check an agent action against a mandate",
+      "description": "Send SendMessage with one data part {\"mandate\": {...}, \"action\": {...}} (or a text part holding that JSON). The reply message carries the decision as data (outcome permit, deny, escalate or error, with reason and clause) and as one line of text. Treat error as deny. Schemas: https://hanria.ai/skill/schema/mandate.schema.json and https://hanria.ai/skill/schema/action-request.schema.json. Same evaluator as the MCP tool check_action at https://check.hanria.ai/v1/mcp.",
+      "tags": [
+        "mandate",
+        "policy",
+        "authorization",
+        "permission",
+        "guardrail",
+        "agent safety",
+        "pre-action check"
+      ],
+      "examples": [
+        "{\"mandate\":{\"schema_version\":\"0.2-draft\",\"mandate_id\":\"minimal-permit\",\"purpose\":\"Permit one file action.\",\"default\":\"deny\",\"clauses\":[{\"id\":\"permit-file\",\"effect\":\"permit\",\"match\":{\"kind\":[\"file\"]}}]},\"action\":{\"schema_version\":\"0.1-draft\",\"requested_by\":{\"agent\":\"example-agent\"},\"operation\":{\"kind\":\"file\",\"verb\":\"read\",\"target\":\"/tmp/example\"},\"justification\":\"Read the permitted file.\"}}"
+      ],
+      "inputModes": [
+        "application/json",
+        "text/plain"
+      ],
+      "outputModes": [
+        "application/json",
+        "text/plain"
+      ]
+    },
+    {
+      "id": "validate_mandate",
+      "name": "Validate a mandate before relying on it",
+      "description": "Send SendMessage with one data part {\"mandate\": {...}} and no action, or a text part holding that JSON. The reply message carries the validation result as data and one line of text. Same validator as the MCP tool validate_mandate at https://check.hanria.ai/v1/mcp.",
+      "tags": [
+        "mandate",
+        "validation",
+        "policy",
+        "agent safety"
+      ],
+      "examples": [
+        "{\"mandate\":{\"schema_version\":\"0.2-draft\",\"mandate_id\":\"validate-file-sandbox\",\"purpose\":\"Permit reads in one workspace.\",\"default\":\"deny\",\"clauses\":[{\"id\":\"permit-workspace-read\",\"effect\":\"permit\",\"match\":{\"kind\":[\"file\"],\"verb\":[\"read\"],\"target_prefix\":[\"/workspace/\"]}}]}}"
+      ],
+      "inputModes": [
+        "application/json",
+        "text/plain"
+      ],
+      "outputModes": [
+        "application/json",
+        "text/plain"
+      ]
+    }
+  ]
+}

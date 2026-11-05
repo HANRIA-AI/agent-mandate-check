@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "ai.hanria/agent-mandate-check",
+  "description": "Check an agent action against its operator's mandate before acting: permit, deny or escalate.",
+  "title": "HANRIA agent mandate check",
+  "version": "0.7.4",
+  "websiteUrl": "https://hanria.ai/",
+  "icons": [
+    {
+      "src": "https://hanria.ai/favicon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://check.hanria.ai/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://check.hanria.ai/v1/mcp"
+    }
+  ]
+}
